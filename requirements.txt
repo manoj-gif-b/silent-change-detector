@@ -1,0 +1,27 @@
+# Silent Change Detector - dependencies
+# Target: Python 3.11
+
+# PDF parsing
+PyMuPDF>=1.24.0
+
+# Gemini LLM (official SDK)
+google-genai>=0.3.0
+
+# Data / arithmetic
+pandas>=2.2.0
+numpy>=1.26.0
+
+# Env / config
+python-dotenv>=1.0.0
+
+# Networking / downloads
+requests>=2.31.0
+
+# Dashboard
+streamlit>=1.36.0
+
+# Testing
+pytest>=8.0.0
+
+# PDF export for the dashboard
+reportlab>=4.0.0
