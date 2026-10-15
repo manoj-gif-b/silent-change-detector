@@ -23,8 +23,12 @@ pipeline runs unchanged for any company in the sector.
 - **All arithmetic is done in Python/pandas**, never by the LLM (see
   `scd/arithmetic.py`, covered by `tests/test_arithmetic.py`).
 - **LLM = Gemini** via the official `google-genai` package. Key from
-  `GEMINI_API_KEY` in `.env`; model from `GEMINI_MODEL` (default
-  `gemini-2.5-flash`).
+  `GEMINI_API_KEY` in `.env`; model(s) from `GEMINI_MODELS` — a comma-separated
+  fallback list (e.g. `gemini-3.8-flash,gemini-2.5-flash`). If a model returns
+  `503/504/429` or a connection error after 3 attempts, the next model in the
+  list is tried automatically. `GEMINI_MODEL` still works as a single-model
+  fallback for backward compatibility. Note `gemini-2.5-flash` is retired for
+  new accounts (it 404s) — prefer `gemini-3.8-flash`.
 - **Every LLM call and every download is cached on disk** (`cache/`), so reruns
   are fast and free.
 - **No investment recommendations.** This is a research finding, not advice.
@@ -156,11 +160,30 @@ It reports, in order:
    spaces and quotes from the key before use.
 3. **Does a tiny real call succeed?** — routed through `scd/llm.py` so it gets
    the same retry/classification. It labels failures as *bad key*,
-   *model not found*, *rate limit* or *network*.
+   *model not found*, *rate limit*, *network* or **server**.
+   - **`[server]`** = Google's own capacity problem (`503 UNAVAILABLE` "high
+     demand" / `504 DEADLINE_EXCEEDED`). The request reached Google fine — this
+     is transient and **not** your key or network. Just rerun; the retry/backoff
+     already tries 5 times and cached calls are never repeated.
+   - **`[model not found]`** = the model isn't offered to your account.
+     `gemini-2.5-flash` is retired for new users → add a live model to
+      `GEMINI_MODELS` (e.g. `gemini-3.8-flash,gemini-2.5-flash`). With a list,
+      a retired/overloaded model is skipped automatically.
 
-`scd/llm.py` retries transient failures (ECONNRESET, timeouts, HTTP 429 and
-5xx) with exponential backoff — 5 attempts, 2s up to 30s — uses a 60s per-request
-timeout, caches every response by `hash(model, prompt)`, and never logs the key.
+`scd/llm.py` is built to ride out overload and flaky networks:
+
+- **Multi-model fallback.** It reads `GEMINI_MODELS` (a comma-separated list)
+  and tries each model in order. A model that fails with `503/504/429` or an
+  SSL/connection error after 3 attempts is abandoned and the **next** model is
+  used. `GEMINI_MODEL` still works on its own for backward compatibility.
+- **Jittered exponential backoff**, 3s → 60s (random ±50%), so retries don't
+  stampede an already-overloaded API.
+- **120s per-request timeout.**
+- **Prints which model actually answered** each call (`[llm] answered by model:
+  …`), so you can watch the fallback happen live.
+- **Caches every successful response on disk by `(prompt, task)` — not by
+  model** — so a result from *any* model is reused and a run resumes after a
+  crash without repeating a call. The API key is never logged or printed.
 
 To keep working with no internet at all, set `LLM_MODE=offline` in `.env`: the
 pipeline then uses the built-in scripted LLM so it stays fully testable.

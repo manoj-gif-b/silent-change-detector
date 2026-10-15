@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink-950 text-mist-100 antialiased;
+  /* Subtle radial wash so large dark areas don't read as flat black on a projector. */
+  background-image:
+    radial-gradient(1200px 600px at 15% -10%, rgba(14, 165, 233, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(129, 140, 248, 0.06), transparent 55%);
+  background-attachment: fixed;
+}
+
+/* Thin, calm scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #1e293b;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Panels used across sections. */
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-white/5 bg-ink-850/70 shadow-panel backdrop-blur-sm;
+  }
+  .panel-hover {
+    @apply transition-colors hover:border-accent-500/40 hover:bg-ink-800/70;
+  }
+  .section-title {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-mist-400;
+  }
+  .quote {
+    @apply border-l-2 border-accent-500/50 pl-3 font-mono text-sm leading-relaxed text-mist-300;
+  }
+  .link-claim {
+    @apply cursor-pointer underline decoration-dotted decoration-mist-600 underline-offset-4 transition-colors hover:text-accent-300 hover:decoration-accent-400;
+  }
+}
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

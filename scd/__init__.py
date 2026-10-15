@@ -1,3 +1,4 @@
+
 """Silent Change Detector (SCD) shared helpers.
 
 This package holds everything that is NOT one of the named pipeline modules:

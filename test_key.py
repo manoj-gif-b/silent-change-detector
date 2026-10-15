@@ -118,6 +118,12 @@ def check_llm_call() -> bool:
         elif exc.kind == "bad key":
             print("         -> The key exists but was rejected: it may be revoked,")
             print("            expired, or belong to a different Google Cloud project.")
+        elif exc.kind == "model not found":
+            print("         -> The model name is not offered to your account. gemini-2.5-flash")
+            print("            is retired for new users; try GEMINI_MODEL=gemini-3.8-flash.")
+        elif exc.kind == "server":
+            print("         -> Google's server was overloaded (503/504 'high demand').")
+            print("            Transient and Google-side -- not your key/network. Rerun shortly.")
         return False
     except Exception as exc:  # unclassified -- still report, never crash
         print(f"LLM     : FAILED [unhandled {type(exc).__name__}] {str(exc)[:200]}")
@@ -159,6 +165,9 @@ def main() -> int:
         return 0
 
     print("\nVERDICT : network + key look fine, but the Gemini call failed (kind above).")
+    print("          - [server] 503/504 = Google overloaded, transient: just rerun.")
+    print("          - [model not found] = pick a model your account can use.")
+    print("          - [rate limit] = wait, then rerun (cache means no repeats).")
     return 1
 
 

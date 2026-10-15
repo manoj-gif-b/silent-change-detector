@@ -60,6 +60,39 @@ If no KPI is present, return an empty array: [].
 {context}
 """
 
+# Batched variant: several excerpts from the SAME document are sent in one call
+# to reduce the number of round-trips. Each excerpt is wrapped in an <EXCERPT>
+# tag carrying its own page number; the model attributes every KPI to the page
+# of the excerpt it came from (the "page" key below), which preserves the
+# evidence trail exactly as in the single-chunk version.
+KPI_EXTRACT_BATCH_PROMPT = """You are given SEVERAL excerpts (each tagged <EXCERPT page="N">) from the SAME filing, in order.
+
+For EACH excerpt, extract every recurring KEY PERFORMANCE INDICATOR (KPI) as
+defined below, and tag every KPI with the page number of the excerpt it came
+from.
+
+A "recurring KPI" is a metric reported period after period: revenue, volumes,
+EBITDA, margins, PAT, EPS, receivable days, rural/urban mix, value vs volume
+growth, marketing spend, market share, etc.
+
+RULES (strict):
+- Copy values EXACTLY as printed; do no arithmetic; do not invent data.
+- Only extract numbers explicitly present in the excerpt.
+- "definition" = the company's own wording (verbatim, short).
+- "quote" = the exact sentence containing the number.
+- "page" = the page attribute of the <EXCERPT> the KPI came from.
+- If an excerpt has no KPI, contribute nothing for it.
+
+Return a single JSON array covering ALL excerpts. Each element MUST have:
+{{"name": "...", "value": "...", "unit": "...", "definition": "...",
+  "period": "...", "page": <int>, "quote": "..."}}
+
+If nothing qualifies across all excerpts, return: [].
+
+----- FILING EXCERPTS -----
+{context}
+"""
+
 
 # ---------------------------------------------------------------------------
 # Narrative topic tagging (for narrative_vs_numbers)

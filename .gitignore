@@ -1,11 +1,17 @@
 # --- Secrets ---
 .env
+.env.*
 *.env
+*.pyc
 !.env.example
 
 # --- Caches & generated data (required to ignore) ---
 cache/
 data/
+output/
+node_modules/
+web/node_modules/
+web/.next/
 
 # --- Python ---
 __pycache__/

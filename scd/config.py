@@ -76,9 +76,56 @@ def get_int_env(name: str, default: int) -> int:
         return default
 
 
+def get_float_env(name: str, default: float) -> float:
+    """Read a float env var, falling back to ``default`` on any error."""
+    try:
+        return float(os.getenv(name, "").strip())
+    except (ValueError, TypeError):
+        return default
+
+
+def get_bool_env(name: str, default: bool) -> bool:
+    """Read a boolean env var (1/true/yes/on -> True; 0/false/no/off -> False)."""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # Tuning knobs (documented in .env.example)
 CHUNK_BATCH_SIZE: int = get_int_env("SCD_CHUNK_BATCH_SIZE", 12)
 CHUNK_CHARS: int = get_int_env("SCD_CHUNK_CHARS", 3000)
+
+# -- Speed / throughput tuning for the ledger (KPI extraction) -------------
+# Number of worker threads used to call the LLM concurrently. Keep modest on
+# the free tier so bursts don't trip rate limits (the limiter below also helps).
+LLM_CONCURRENCY: int = max(1, get_int_env("SCD_LLM_CONCURRENCY", 4))
+# Soft requests-per-minute cap across all workers (0 disables the limiter).
+LLM_MAX_RPM: int = max(0, get_int_env("SCD_LLM_MAX_RPM", 15))
+# Per-request network timeout in seconds. Spec default is 120s so a slow
+# 503/504 + retry/backoff cycle has room to complete on flaky networks. Floor of
+# 30s prevents a premature abort of a slow-but-successful first token. Override
+# with SCD_LLM_TIMEOUT_SECONDS.
+LLM_TIMEOUT_SECONDS: float = max(30.0, get_float_env("SCD_LLM_TIMEOUT_SECONDS", 120.0))
+# Target characters of chunk text packed into a single batched LLM call. Larger
+# = fewer calls. Only applied for the real (Gemini) provider; the offline demo
+# keeps one chunk per call so its page numbers stay exact.
+LEDGER_BATCH_CHARS: int = max(2000, get_int_env("SCD_LEDGER_BATCH_CHARS", 24000))
+# Skip chunks that almost certainly contain no KPIs (TOC, legal boilerplate).
+LEDGER_RELEVANCE_FILTER: bool = get_bool_env("SCD_LEDGER_RELEVANCE_FILTER", True)
+
+# Cheap keyword vocabulary for the relevance filter. A chunk is considered
+# KPI-relevant if it contains a number-ish token OR any of these financial
+# signal words. Deliberately broad so we never drop a chunk that might hold a
+# KPI; it only removes obvious boilerplate (disclaimers, TOC, signature pages).
+KPI_SIGNAL_WORDS: tuple[str, ...] = (
+    "revenue", "sales", "turnover", "income", "ebitda", "ebit", "pat", "profit",
+    "margin", "volume", "growth", "crop", "crore", "lakh", "million", "billion",
+    "tonne", "mt", "receivable", "inventory", "eps", "dividend", "capex",
+    "market share", "gross", "operating", "net profit", "expense", "cost",
+    "realisation", "realization", "asp", "yoy", "y-o-y", "qoq", "q-o-q",
+    "rural", "urban", "quick commerce", "e-commerce", "distribution",
+)
 
 # Number of years of periods the disclosure ledger should span.
 LEDGER_YEARS: int = 5

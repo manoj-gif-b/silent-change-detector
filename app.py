@@ -28,7 +28,7 @@ import pandas as pd
 import streamlit as st
 
 from scd import config
-from report import load_report
+from report import build_pdf_bytes, load_report
 
 st.set_page_config(
     page_title="Silent Change Detector",
@@ -77,134 +77,6 @@ def _numbers_table(numbers: dict) -> pd.DataFrame:
             value = json.dumps(value, ensure_ascii=False)
         rows.append({"metric": key, "value": value})
     return pd.DataFrame(rows)
-
-
-# ---------------------------------------------------------------------------
-# PDF export (reportlab)
-# ---------------------------------------------------------------------------
-def _pdf_safe(text: str) -> str:
-    """Make text safe for Helvetica in reportlab (latin-1)."""
-    if text is None:
-        return ""
-    s = str(text)
-    s = (s.replace("\u20b9", "Rs.").replace("\u2019", "'")
-          .replace("\u2018", "'").replace("\u201c", '"').replace("\u201d", '"')
-          .replace("\u2013", "-").replace("\u2014", "-").replace("\u2026", "..."))
-    return s.encode("latin-1", "replace").decode("latin-1")
-
-
-def _build_pdf_bytes(report: dict, company: str) -> bytes:
-    """Render the final report to a PDF; returns the raw PDF bytes."""
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib.units import cm
-    from reportlab.lib import colors
-    from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-        ListFlowable, ListItem,
-    )
-    import io
-
-    styles = getSampleStyleSheet()
-    story = []
-
-    story.append(Paragraph(_pdf_safe(f"Silent Change Detector -- {company}"), styles["Title"]))
-    story.append(Spacer(1, 0.2 * cm))
-    story.append(Paragraph(
-        "<i>Autonomous research finding (ATMOS 2026, Track C). "
-        "Not investment advice.</i>", styles["Italic"],
-    ))
-    story.append(Spacer(1, 0.4 * cm))
-
-    story.append(Paragraph("Discovery", styles["Heading2"]))
-    story.append(Paragraph(_pdf_safe(report.get("discovery", "")), styles["BodyText"]))
-    story.append(Spacer(1, 0.3 * cm))
-
-    story.append(Paragraph("Why it matters", styles["Heading2"]))
-    bullets = report.get("why_it_matters") or []
-    story.append(ListFlowable(
-        [ListItem(Paragraph(_pdf_safe(b), styles["BodyText"])) for b in bullets]
-        or [Paragraph("(none)", styles["BodyText"])],
-        bulletType="bullet",
-    ))
-    story.append(Spacer(1, 0.3 * cm))
-
-    story.append(Paragraph("Key numbers (verified arithmetic)", styles["Heading2"]))
-    numbers = report.get("numbers") or {}
-    if numbers:
-        data = [["Metric", "Value"]] + [
-            [_pdf_safe(k),
-             _pdf_safe(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False))]
-            for k, v in numbers.items()
-        ]
-        table = Table(data, hAlign="LEFT")
-        table.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        story.append(table)
-    else:
-        story.append(Paragraph("(no numbers recorded)", styles["BodyText"]))
-    story.append(Spacer(1, 0.3 * cm))
-
-    story.append(Paragraph("Timeline", styles["Heading2"]))
-    for point in report.get("timeline") or []:
-        if not isinstance(point, dict):
-            continue
-        story.append(Paragraph(
-            _pdf_safe(f"{point.get('date', '?')} -- {point.get('period', '?')}: "
-                      f"{point.get('event', '')}"),
-            styles["BodyText"],
-        ))
-    story.append(Spacer(1, 0.3 * cm))
-
-    story.append(Paragraph("Counterargument (red team)", styles["Heading2"]))
-    story.append(Paragraph(_pdf_safe(report.get("counterargument", "")), styles["BodyText"]))
-    story.append(Spacer(1, 0.3 * cm))
-
-    story.append(Paragraph("Falsification condition", styles["Heading2"]))
-    story.append(Paragraph(_pdf_safe(report.get("falsification_condition", "")), styles["BodyText"]))
-    story.append(Spacer(1, 0.3 * cm))
-
-    strength = report.get("evidence_strength") or {}
-    # Be robust to either the full dict shape or a bare rating string.
-    if isinstance(strength, str):
-        strength = {"rating": strength, "reasoning": "", "downgrade_note": None}
-    story.append(Paragraph(
-        _pdf_safe(f"Evidence strength: {strength.get('rating', 'Weak')}"),
-        styles["Heading2"],
-    ))
-    story.append(Paragraph(_pdf_safe(strength.get("reasoning", "")), styles["BodyText"]))
-    if strength.get("downgrade_note"):
-        story.append(Paragraph(
-            _pdf_safe(f"Downgrade note: {strength['downgrade_note']}"), styles["BodyText"],
-        ))
-    story.append(Spacer(1, 0.3 * cm))
-
-    story.append(Paragraph(
-        "Evidence trail (finding -> document -> page -> quote)", styles["Heading2"],
-    ))
-    for ev in report.get("evidence_trail") or []:
-        story.append(Paragraph(
-            _pdf_safe(f"[{ev.get('document', '?')}, p.{ev.get('page', '?')}] "
-                      f"{ev.get('quote', '')}"),
-            styles["BodyText"],
-        ))
-        if ev.get("link"):
-            story.append(Paragraph(
-                _pdf_safe(f"<i>file: {ev['link']}</i>"), styles["BodyText"],
-            ))
-
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        leftMargin=2 * cm, rightMargin=2 * cm,
-        topMargin=2 * cm, bottomMargin=2 * cm,
-        title=f"Silent Change Detector -- {_pdf_safe(company)}",
-    )
-    doc.build(story)
-    return buffer.getvalue()
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +140,7 @@ col4.metric("Anomaly score", meta.get("anomaly_score") if meta.get("anomaly_scor
 
 st.download_button(
     "⬇️ Export report as PDF",
-    data=_build_pdf_bytes(report, selected),
+    data=build_pdf_bytes(report, selected),
     file_name=f"silent_change_detector_{config.slugify(selected)}.pdf",
     mime="application/pdf",
 )
