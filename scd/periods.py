@@ -62,26 +62,42 @@ def parse_period(raw: str | None) -> Period | None:
 
     # Fiscal year: "FY24", "fy 2024", "FY 2023-24", "Q3 FY24".
     fy = None
-    m = re.search(r"\bfy\s*'?\s*(\d{2,4})", s, re.IGNORECASE)
+    m = re.search(r"\bfy\s*'?\s*(\d{2,4})(?:\s+(\d{2}))?\b", s, re.IGNORECASE)
     if m:
         fy = _normalise_year(int(m.group(1)))
+        end2 = m.group(2)
+        if end2 is not None:
+            # "FY 2025-26": treat second number as end year only if it is
+            # first_year + 1 (mod 100), per Indian convention (FY ends March).
+            start2 = fy % 100
+            if int(end2) == (start2 + 1) % 100:
+                fy = fy - start2 + int(end2)
         if q is None:
             # Optional range "fy 2023-24" already handled by first token.
             q = 5  # treat bare FY as annual
 
     if fy is None:
         # A bare 4-digit calendar year, or a 2-digit like '24.
-        m = re.search(r"\b(20\d{2})\b", s)
+        # Range "2025-26" -> "2025 26": use end year only if second == first+1 mod 100.
+        m = re.search(r"\b(20\d{2})\s+(\d{2})\b", s)
         if m:
-            fy = _normalise_year(int(m.group(1)))
-            q = q if q is not None else 5
-        else:
-            m = re.search(r"\b(\d{2})\b", s)
+            start = int(m.group(1))
+            end2 = int(m.group(2))
+            if end2 == (start % 100 + 1) % 100:
+                fy = start - (start % 100) + end2
+                q = 5
+        if fy is None:
+            m = re.search(r"\b(20\d{2})\b", s)
             if m:
-                two = int(m.group(1))
-                if 15 <= two <= 40:  # plausible FY short-code (FY15..FY40)
-                    fy = 2000 + two
-                    q = q if q is not None else 5
+                fy = _normalise_year(int(m.group(1)))
+                q = q if q is not None else 5
+            else:
+                m = re.search(r"\b(\d{2})\b", s)
+                if m:
+                    two = int(m.group(1))
+                    if 15 <= two <= 40:  # plausible FY short-code (FY15..FY40)
+                        fy = 2000 + two
+                        q = q if q is not None else 5
 
     if fy is None:
         return None

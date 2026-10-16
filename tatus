@@ -1,0 +1,43 @@
+[33mcommit 5df6cf92f89255e18fcfda93add09b46cd5f2891[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: Megan <megan@example.com>
+Date:   Thu Oct 15 10:49:18 2026 +0530
+
+    Silent Change Detector: pipeline, API and web frontend
+
+ .env.example                            |   14 [32m+[m[31m-[m
+ .gitignore                              |    6 [32m+[m
+ README.md                               |   37 [32m+[m[31m-[m
+ api.py                                  |  368 [32m++++[m
+ app.py                                  |  132 [32m+[m[31m-[m
+ report.py                               |  136 [32m++[m
+ scd/__init__.py                         |    1 [32m+[m
+ scd/config.py                           |   47 [32m+[m
+ scd/llm.py                              |  305 [32m+++[m[31m-[m
+ scd/prompts.py                          |   33 [32m+[m
+ test_key.py                             |    9 [32m+[m
+ tests/test_llm.py                       |  263 [32m+++[m
+ web/next-env.d.ts                       |    5 [32m+[m
+ web/next.config.mjs                     |    8 [32m+[m
+ web/package-lock.json                   | 2858 [32m+++++++++++++++++++++++++++++++[m
+ web/package.json                        |   32 [32m+[m
+ web/postcss.config.mjs                  |    9 [32m+[m
+ web/src/app/globals.css                 |   67 [32m+[m
+ web/src/app/layout.tsx                  |   29 [32m+[m
+ web/src/app/page.tsx                    |  178 [32m++[m
+ web/src/components/analysis.tsx         |  131 [32m++[m
+ web/src/components/api-health.tsx       |   70 [32m+[m
+ web/src/components/evidence-context.tsx |   75 [32m+[m
+ web/src/components/evidence-graph.tsx   |  258 [32m+++[m
+ web/src/components/hero.tsx             |   75 [32m+[m
+ web/src/components/numbers.tsx          |  178 [32m++[m
+ web/src/components/run-box.tsx          |  170 [32m++[m
+ web/src/components/source-panel.tsx     |  130 [32m++[m
+ web/src/components/timeline.tsx         |  134 [32m++[m
+ web/src/components/top-bar.tsx          |  121 [32m++[m
+ web/src/lib/api.ts                      |   63 [32m+[m
+ web/src/lib/helpers.ts                  |   79 [32m+[m
+ web/src/lib/types.ts                    |  134 [32m++[m
+ web/tailwind.config.ts                  |   74 [32m+[m
+ web/tsconfig.json                       |   21 [32m+[m
+ web/tsconfig.tsbuildinfo                |    1 [32m+[m
+ 36 files changed, 6049 insertions(+), 202 deletions(-)

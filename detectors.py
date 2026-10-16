@@ -109,6 +109,22 @@ def _safe_int(x) -> int | None:
         return None
 
 
+def _norm_text(v) -> str:
+    """Normalise a ledger text field (definition/unit/wording) for comparison.
+
+    Ledger cells are not guaranteed to be strings: ``pd.read_csv`` turns empty
+    cells into float ``NaN`` (e.g. the Britannia Headcount row's ``unit``), and
+    the LLM may emit plain numbers. ``float('nan')`` is truthy, so the old
+    ``(v or '').strip()`` idiom crashed with ``'float' object has no attribute
+    'strip'``. Here None/NaN become ``''`` (missing) and everything else is
+    stringified, then stripped+lowered exactly as before -- so valid text
+    compares identically to the original code.
+    """
+    if v is None or pd.isna(v):
+        return ""
+    return str(v).strip().lower()
+
+
 # ---------------------------------------------------------------------------
 # Detector 1: vanished_or_redefined
 # ---------------------------------------------------------------------------
@@ -127,22 +143,40 @@ def detect_vanished_or_redefined(ledger: pd.DataFrame, company: str) -> list[dic
         return []
 
     anomalies: list[dict] = []
-    all_periods = sort_periods(ledger["period"].dropna().unique().tolist())
+    # Build sort-key index of all parseable periods; skip unparseable with a warning.
+    # Two labels with the same sort_key (e.g. "2025-26" and "FY26") count as the
+    # same period. Periods that cannot be parsed are skipped entirely.
+    all_periods: list[str] = []
+    label_to_key: dict[str, int] = {}
+    for p in sort_periods(ledger["period"].dropna().unique().tolist()):
+        pp = parse_period(p)
+        if pp is None:
+            logger.warning("Skipping unparseable period %r", p)
+            continue
+        all_periods.append(p)
+        label_to_key[p] = pp.sort_key
     latest_period = all_periods[-1] if all_periods else None
 
     for name, grp in ledger.groupby("name"):
         grp = grp.copy()
-        reported_periods = sort_periods(grp["period"].dropna().unique().tolist())
+        reported_periods: list[str] = []
+        reported_keys: set[int] = set()
+        for p in sort_periods(grp["period"].dropna().unique().tolist()):
+            pp = parse_period(p)
+            if pp is None:
+                logger.warning("Skipping unparseable period %r", p)
+                continue
+            reported_periods.append(p)
+            reported_keys.add(pp.sort_key)
         if not reported_periods:
             continue
 
         # --- vanished signal ---
-        missing_after = [p for p in all_periods if p not in set(reported_periods)]
+        missing_after = [p for p in all_periods if label_to_key[p] not in reported_keys]
         # Only count trailing periods where the company WAS active.
-        reported_set = set(reported_periods)
         trailing_missing = []
         for p in reversed(all_periods):
-            if p in reported_set:
+            if label_to_key[p] in reported_keys:
                 break
             trailing_missing.append(p)
         trailing_missing.reverse()
@@ -227,8 +261,10 @@ def _detect_redefinition(grp: pd.DataFrame) -> dict:
 
     defs = []
     for _, r in grp_sorted.iterrows():
-        d = (r.get("definition") or "").strip().lower()
-        u = (r.get("unit") or "").strip().lower()
+        # definition/unit may be NaN (empty CSV cell) or numeric, so they go
+        # through _norm_text instead of a bare (v or '').strip().
+        d = _norm_text(r.get("definition"))
+        u = _norm_text(r.get("unit"))
         defs.append((d, u))
 
     changed = False

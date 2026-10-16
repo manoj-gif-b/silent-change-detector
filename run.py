@@ -189,7 +189,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--max-chunks", type=int, default=None, metavar="N",
-        help="Only process the first N chunks (quicker, useful for testing).",
+        help="Send at most N chunks to the LLM (after the KPI relevance filter). "
+             "Useful for a quick test run before the full one.",
     )
     p.add_argument(
         "--llm-model", default=None, metavar="MODEL",

@@ -105,41 +105,43 @@ def infer_period(filename: str, text_sample: str = "") -> str:
     """Best-effort canonical period label (e.g. ``FY24`` or ``Q3 FY24``).
 
     Indian fiscal years end March 31, so a year labelled FY24 spans Apr-2023 to
-    Mar-2024. We try filename first, then a text sample, and finally fall back
-    to "unknown".
+    Mar-2024. We try the document text first (the report's own words are
+    authoritative), then the filename, and finally fall back to "unknown".
     """
-    hay = f"{filename} {text_sample}".lower()
-    # Normalise common separators so "Q3_FY2024", "q3-fy24" and "Q3 FY24" match.
-    hay = hay.replace("_", " ").replace("-", " ")
+    for hay in (text_sample.lower(), filename.lower()):
+        if not hay:
+            continue
+        # Normalise common separators so "Q3_FY2024", "q3-fy24" and "Q3 FY24" match.
+        h = hay.replace("_", " ").replace("-", " ")
 
-    # Pattern 1: explicit "Q3 FY24" / "q3 fy2024".
-    m = re.search(r"\bq([1-4])\s*(?:fy)?\s*'?(\d{2,4})\b", hay)
-    if m:
-        q = f"Q{m.group(1)}"
-        yr = int(m.group(2))
-        return _fy_year_from_label(yr, q)
+        # Pattern 1: explicit "Q3 FY24" / "q3 fy2024".
+        m = re.search(r"\bq([1-4])\s*(?:fy)?\s*'?(\d{2,4})\b", h)
+        if m:
+            q = f"Q{m.group(1)}"
+            yr = int(m.group(2))
+            return _fy_year_from_label(yr, q)
 
-    # Pattern 2: "FY24" / "fy 2023-24" / "fy2024".
-    m = re.search(r"\bfy\s*'?(\d{2,4})(?:\s*[/ ]\s*(\d{2}))?\b", hay)
-    if m:
-        yr = int(m.group(1))
-        # For a range like 2023-24 the fiscal year label uses the ending year.
-        if m.group(2):
-            end2 = int(m.group(2))
-            start2 = yr % 100
-            yr = yr - start2 + end2
-        return _fy_year_from_label(yr, None)
+        # Pattern 2: "FY24" / "fy 2023-24" / "fy2024".
+        m = re.search(r"\bfy\s*'?(\d{2,4})(?:\s*[/ ]\s*(\d{2}))?\b", h)
+        if m:
+            yr = int(m.group(1))
+            # For a range like 2023-24 the fiscal year label uses the ending year.
+            if m.group(2):
+                end2 = int(m.group(2))
+                start2 = yr % 100
+                yr = yr - start2 + end2
+            return _fy_year_from_label(yr, None)
 
-    # Pattern 3: a bare 4-digit year (e.g. "annual_report_2024.pdf").
-    m = re.search(r"\b(20\d{2})\b", hay)
-    if m:
-        return _fy_year_from_label(int(m.group(1)), None)
+        # Pattern 3: a bare 4-digit year (e.g. "annual_report_2024.pdf").
+        m = re.search(r"\b(20\d{2})\b", h)
+        if m:
+            return _fy_year_from_label(int(m.group(1)), None)
 
-    # Pattern 4: month name near a year -> quarter (fiscal).
-    m = re.search(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(20\d{2})\b", hay)
-    if m:
-        q = _MONTHS[m.group(1)]
-        return _fy_year_from_label(int(m.group(2)), q)
+        # Pattern 4: month name near a year -> quarter (fiscal).
+        m = re.search(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(20\d{2})\b", h)
+        if m:
+            q = _MONTHS[m.group(1)]
+            return _fy_year_from_label(int(m.group(2)), q)
 
     return "unknown"
 
